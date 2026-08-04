@@ -6,7 +6,7 @@ ARG NODEJS_VERSION=20
 ARG OS_VERSION=trixie
 
 # Jellyfin FFMPEG package
-ARG FFMPEG_PACKAGE=jellyfin-ffmpeg7
+ARG FFMPEG_PACKAGE=jellyfin-ffmpeg8
 
 # https://github.com/intel/compute-runtime/releases
 ARG GMMLIB_VER=22.10.0
@@ -170,6 +170,7 @@ RUN apt-get update \
     libfontconfig1 \
     libfreetype6 \
     libjemalloc2 \
+    libdrm2 \
  && sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen && locale-gen \
  && apt-get remove gnupg apt-transport-https --yes \
  && apt-get clean autoclean --yes \
