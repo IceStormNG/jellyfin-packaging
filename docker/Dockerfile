@@ -11,9 +11,9 @@ ARG FFMPEG_PACKAGE=jellyfin-ffmpeg8
 # https://github.com/intel/compute-runtime/releases
 ARG GMMLIB_VER=22.10.0
 # >= Gen12 graphics (current)
-ARG IGC2_VER=2.34.4
-ARG IGC2_BUILD=21428
-ARG NEO_VER=26.18.38308.1
+ARG IGC2_VER=2.40.13
+ARG IGC2_BUILD=22418
+ARG NEO_VER=26.31.39395.13
 # <= Gen11 graphics (legacy)
 ARG IGC1_LEGACY_VER=1.0.17537.24
 ARG NEO_LEGACY_VER=24.35.30872.36
@@ -154,7 +154,7 @@ RUN apt-get update \
   | gpg --dearmor -o /etc/apt/keyrings/jellyfin.gpg \
  && cat <<EOF > /etc/apt/sources.list.d/jellyfin.sources
 Types: deb
-URIs: https://repo.jellyfin.org/debian
+URIs: https://repo.jellyfin.org/master/debian
 Suites: ${OS_VERSION}
 Components: main
 Architectures: ${PACKAGE_ARCH}
