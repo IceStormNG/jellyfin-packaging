@@ -10,14 +10,14 @@ on:
         description: 'The server and web stable release tag (i.e. "vX.Y.Z")'
 
 env:
-  SDK_VERSION: "9.0.x"
+  SDK_VERSION: "10.0.x"
 
 permissions:
   contents: read
 
 jobs:
   Docker:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     continue-on-error: false  # true in prod, false for testing
     steps:
       - name: "Set dated version for unstable builds"
@@ -45,10 +45,10 @@ jobs:
           GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
           GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
         run: |-
-          sudo --preserve-env ./build.py ${{ env.JELLYFIN_VERSION }} docker ${{ env.DEBUG_FLAG }}
+          sudo --preserve-env=DOCKER_USERNAME,DOCKER_TOKEN,GHCR_USERNAME,GHCR_TOKEN ./build.py ${{ env.JELLYFIN_VERSION }} docker ${{ env.DEBUG_FLAG }}
 
   Debian:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     strategy:
       fail-fast: false
       matrix:
@@ -128,13 +128,13 @@ jobs:
             fi
 
             # Only keep the latest point release for a given stable version; i.e. 10.10.14 obsoletes 10.10.13 and removes it, while leaving 10.9.10
-            NEW_VERSION=${{ matrix.release }}
+            NEW_VERSION=${{ env.JELLYFIN_VERSION }}
             NEW_MAJOR_VERSION="${NEW_VERSION#v}"
             NEW_MAJOR_VERSION="${NEW_MAJOR_VERSION%.*}"
-            NEW_POINT_VERSION="${NEW_VERSION##*.}"
-            if [[ ${NEW_POINT_VERSION} -gt 0 ]]; then
-                LAST_POINT_VERSION=$(( NEW_POINT_VERSION - 1 ))
-                LAST_VERSION="${NEW_MAJOR_VERSION}.${LAST_POINT_VERSION}"
+            NEW_MINOR_VERSION="${NEW_VERSION##*.}"
+            if [[ ${NEW_MINOR_VERSION} -gt 0 ]]; then
+                LAST_MINOR_VERSION=$(( NEW_MINOR_VERSION - 1 ))
+                LAST_VERSION="${NEW_MAJOR_VERSION}.${LAST_MINOR_VERSION}"
                 for PACKAGE in jellyfin jellyfin-server jellyfin-web; do
                     for SCRAP_VERSION in $( sudo reprepro --waitforlock 30 --basedir /srv/debian --component ${COMPONENT} list ${{ matrix.release }} | grep "${PACKAGE} " | grep "${LAST_VERSION}" | sort | uniq ); do
                         sudo reprepro --waitforlock 30 --basedir /srv/debian --component ${COMPONENT} remove ${{ matrix.release }} ${PACKAGE}=${SCRAP_VERSION}
@@ -150,7 +150,16 @@ jobs:
           key: "${{ secrets.REPO_KEY }}"
           debug: false
           script: |
+            set -e
             export BASEDIR="/srv/repository/main/server/debian"
+            NEW_VERSION=${{ env.JELLYFIN_VERSION }}
+            NEW_MINOR_VERSION="${NEW_VERSION##*.}"
+            if [[ ${NEW_MINOR_VERSION} -eq 0 ]]; then
+                # Remove preview since we just released the real version
+                if [[ -L ${BASEDIR}/latest-preview ]]; then
+                    sudo rm -f ${BASEDIR}/latest-preview
+                fi
+            fi
             sudo mkdir -p ${BASEDIR}/${{ env.JELLYFIN_RELEASE_TYPE }}/${{ env.JELLYFIN_VERSION }}/${{ matrix.arch }} || exit 1
             sudo mv -t ${BASEDIR}/${{ env.JELLYFIN_RELEASE_TYPE }}/${{ env.JELLYFIN_VERSION }}/${{ matrix.arch }}/ /srv/incoming/server/${{ env.JELLYFIN_VERSION }}/debian/${{ matrix.release }}/${{ matrix.arch }}/* || exit 1
             sudo rm ${BASEDIR}/latest-${{ env.JELLYFIN_RELEASE_TYPE }} || true
@@ -159,7 +168,7 @@ jobs:
             sudo ln -sf ${BASEDIR}/${{ env.JELLYFIN_RELEASE_TYPE }}/${{ env.JELLYFIN_VERSION }} ${BASEDIR}/latest || exit 1
 
   Ubuntu:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     strategy:
       fail-fast: false
       matrix:
@@ -240,13 +249,13 @@ jobs:
             fi
 
             # Only keep the latest point release for a given stable version; i.e. 10.10.14 obsoletes 10.10.13 and removes it, while leaving 10.9.10
-            NEW_VERSION=${{ matrix.release }}
+            NEW_VERSION=${{ env.JELLYFIN_VERSION }}
             NEW_MAJOR_VERSION="${NEW_VERSION#v}"
             NEW_MAJOR_VERSION="${NEW_MAJOR_VERSION%.*}"
-            NEW_POINT_VERSION="${NEW_VERSION##*.}"
-            if [[ ${NEW_POINT_VERSION} -gt 0 ]]; then
-                LAST_POINT_VERSION=$(( NEW_POINT_VERSION - 1 ))
-                LAST_VERSION="${NEW_MAJOR_VERSION}.${LAST_POINT_VERSION}"
+            NEW_MINOR_VERSION="${NEW_VERSION##*.}"
+            if [[ ${NEW_MINOR_VERSION} -gt 0 ]]; then
+                LAST_MINOR_VERSION=$(( NEW_MINOR_VERSION - 1 ))
+                LAST_VERSION="${NEW_MAJOR_VERSION}.${LAST_MINOR_VERSION}"
                 for PACKAGE in jellyfin jellyfin-server jellyfin-web; do
                     for SCRAP_VERSION in $( sudo reprepro --waitforlock 30 --basedir /srv/ubuntu --component ${COMPONENT} list ${{ matrix.release }} | grep "${PACKAGE} " | grep "${LAST_VERSION}" | sort | uniq ); do
                         sudo reprepro --waitforlock 30 --basedir /srv/ubuntu --component ${COMPONENT} remove ${{ matrix.release }} ${PACKAGE}=${SCRAP_VERSION}
@@ -262,7 +271,16 @@ jobs:
           key: "${{ secrets.REPO_KEY }}"
           debug: false
           script: |
+            set -e
             export BASEDIR="/srv/repository/main/server/ubuntu"
+            NEW_VERSION=${{ env.JELLYFIN_VERSION }}
+            NEW_MINOR_VERSION="${NEW_VERSION##*.}"
+            if [[ ${NEW_MINOR_VERSION} -eq 0 ]]; then
+                # Remove preview since we just released the real version
+                if [[ -L ${BASEDIR}/latest-preview ]]; then
+                    sudo rm -f ${BASEDIR}/latest-preview
+                fi
+            fi
             sudo mkdir -p ${BASEDIR}/${{ env.JELLYFIN_RELEASE_TYPE }}/${{ env.JELLYFIN_VERSION }}/${{ matrix.arch }} || exit 1
             sudo mv -t ${BASEDIR}/${{ env.JELLYFIN_RELEASE_TYPE }}/${{ env.JELLYFIN_VERSION }}/${{ matrix.arch }}/ /srv/incoming/server/${{ env.JELLYFIN_VERSION }}/ubuntu/${{ matrix.release }}/${{ matrix.arch }}/* || exit 1
             sudo rm ${BASEDIR}/latest-${{ env.JELLYFIN_RELEASE_TYPE }} || true
@@ -271,7 +289,7 @@ jobs:
             sudo ln -sf ${BASEDIR}/${{ env.JELLYFIN_RELEASE_TYPE }}/${{ env.JELLYFIN_VERSION }} ${BASEDIR}/latest || exit 1
 
   Linux:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     strategy:
       fail-fast: false
       matrix:
@@ -324,6 +342,14 @@ jobs:
           script: |
             set -e
             export BASEDIR="/srv/repository/main/server/linux"
+            NEW_VERSION=${{ env.JELLYFIN_VERSION }}
+            NEW_MINOR_VERSION="${NEW_VERSION##*.}"
+            if [[ ${NEW_MINOR_VERSION} -eq 0 ]]; then
+                # Remove preview since we just released the real version
+                if [[ -L ${BASEDIR}/latest-preview ]]; then
+                    sudo rm -f ${BASEDIR}/latest-preview
+                fi
+            fi
             sudo mkdir -p ${BASEDIR}/${{ env.JELLYFIN_RELEASE_TYPE }}/${{ env.JELLYFIN_VERSION }}/${{ matrix.arch }} || exit 1
             sudo mv -t ${BASEDIR}/${{ env.JELLYFIN_RELEASE_TYPE }}/${{ env.JELLYFIN_VERSION }}/${{ matrix.arch }}/ /srv/incoming/server/${{ env.JELLYFIN_VERSION }}/linux/${{ matrix.release }}/${{ matrix.arch }}/* || exit 1
             sudo rm ${BASEDIR}/latest-${{ env.JELLYFIN_RELEASE_TYPE }} || true
@@ -332,7 +358,7 @@ jobs:
             sudo ln -sf ${BASEDIR}/${{ env.JELLYFIN_RELEASE_TYPE }}/${{ env.JELLYFIN_VERSION }} ${BASEDIR}/latest || exit 1
 
   Windows:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     strategy:
       fail-fast: false
       matrix:
@@ -388,6 +414,14 @@ jobs:
           script: |
             set -e
             export BASEDIR="/srv/repository/main/server/windows"
+            NEW_VERSION=${{ env.JELLYFIN_VERSION }}
+            NEW_MINOR_VERSION="${NEW_VERSION##*.}"
+            if [[ ${NEW_MINOR_VERSION} -eq 0 ]]; then
+                # Remove preview since we just released the real version
+                if [[ -L ${BASEDIR}/latest-preview ]]; then
+                    sudo rm -f ${BASEDIR}/latest-preview
+                fi
+            fi
             sudo mkdir -p ${BASEDIR}/${{ env.JELLYFIN_RELEASE_TYPE }}/${{ env.JELLYFIN_VERSION }}/${{ matrix.arch }} || exit 1
             sudo mv -t ${BASEDIR}/${{ env.JELLYFIN_RELEASE_TYPE }}/${{ env.JELLYFIN_VERSION }}/${{ matrix.arch }}/ /srv/incoming/server/${{ env.JELLYFIN_VERSION }}/windows/${{ matrix.release }}/${{ matrix.arch }}/* || exit 1
             sudo rm ${BASEDIR}/latest-${{ env.JELLYFIN_RELEASE_TYPE }} || true
@@ -396,7 +430,7 @@ jobs:
             sudo ln -sf ${BASEDIR}/${{ env.JELLYFIN_RELEASE_TYPE }}/${{ env.JELLYFIN_VERSION }} ${BASEDIR}/latest || exit 1
 
       - name: "Store artifacts for next stage"
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: windows-artifacts
           retention-days: 1
@@ -441,7 +475,7 @@ jobs:
           python checkout.py ${{ inputs.version || 'master' }}
 
       - name: "Fetch artifacts from previous stage"
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: windows-artifacts
           path: ./jellyfin-server-windows
@@ -484,7 +518,7 @@ jobs:
           Rename-Item -Path .\jellyfin_*_windows-x64.exe -NewName ("jellyfin_${{ env.JELLYFIN_VERSION }}_windows-x64.exe")
         
       - name: "Store artifacts for next stage"
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: windows-installer-artifacts
           retention-days: 1
@@ -495,7 +529,7 @@ jobs:
     needs:
       - Windows
       - WindowsInstaller
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     strategy:
       fail-fast: false
       matrix:
@@ -510,7 +544,7 @@ jobs:
           echo "JELLYFIN_RELEASE_TYPE=${{ needs.Windows.outputs.JELLYFIN_RELEASE_TYPE }}" >> $GITHUB_ENV
 
       - name: "Fetch artifact from previous stage"
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: windows-installer-artifacts
 
@@ -536,7 +570,7 @@ jobs:
             sudo mv -t ${BASEDIR}/${{ env.JELLYFIN_RELEASE_TYPE }}/${{ env.JELLYFIN_VERSION }}/${{ matrix.arch }}/ /srv/incoming/server/${{ env.JELLYFIN_VERSION }}/windows/${{ matrix.arch }}/*.exe
 
   MacOS:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     strategy:
       fail-fast: false
       matrix:
@@ -587,6 +621,14 @@ jobs:
           script: |
             set -e
             export BASEDIR="/srv/repository/main/server/macos"
+            NEW_VERSION=${{ env.JELLYFIN_VERSION }}
+            NEW_MINOR_VERSION="${NEW_VERSION##*.}"
+            if [[ ${NEW_MINOR_VERSION} -eq 0 ]]; then
+                # Remove preview since we just released the real version
+                if [[ -L ${BASEDIR}/latest-preview ]]; then
+                    sudo rm -f ${BASEDIR}/latest-preview
+                fi
+            fi
             sudo mkdir -p ${BASEDIR}/${{ env.JELLYFIN_RELEASE_TYPE }}/${{ env.JELLYFIN_VERSION }}/${{ matrix.arch }} || exit 1
             sudo mv -t ${BASEDIR}/${{ env.JELLYFIN_RELEASE_TYPE }}/${{ env.JELLYFIN_VERSION }}/${{ matrix.arch }}/ /srv/incoming/server/${{ env.JELLYFIN_VERSION }}/macos/${{ matrix.release }}/${{ matrix.arch }}/* || exit 1
             sudo rm ${BASEDIR}/latest-${{ env.JELLYFIN_RELEASE_TYPE }} || true
@@ -595,7 +637,7 @@ jobs:
             sudo ln -sf ${BASEDIR}/${{ env.JELLYFIN_RELEASE_TYPE }}/${{ env.JELLYFIN_VERSION }} ${BASEDIR}/latest || exit 1
 
   Portable:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     continue-on-error: false  # true in prod, false for testing
     steps:
       - name: "Set dated version for unstable builds"
@@ -640,6 +682,14 @@ jobs:
           script: |
             set -e
             export BASEDIR="/srv/repository/main/server/portable"
+            NEW_VERSION=${{ env.JELLYFIN_VERSION }}
+            NEW_MINOR_VERSION="${NEW_VERSION##*.}"
+            if [[ ${NEW_MINOR_VERSION} -eq 0 ]]; then
+                # Remove preview since we just released the real version
+                if [[ -L ${BASEDIR}/latest-preview ]]; then
+                    sudo rm -f ${BASEDIR}/latest-preview
+                fi
+            fi
             sudo mkdir -p ${BASEDIR}/${{ env.JELLYFIN_RELEASE_TYPE }}/${{ env.JELLYFIN_VERSION }}/any || exit 1
             sudo mv -t ${BASEDIR}/${{ env.JELLYFIN_RELEASE_TYPE }}/${{ env.JELLYFIN_VERSION }}/any/ /srv/incoming/server/${{ env.JELLYFIN_VERSION }}/portable/${{ matrix.release }}/* || exit 1
             sudo rm ${BASEDIR}/latest-${{ env.JELLYFIN_RELEASE_TYPE }} || true
@@ -648,7 +698,7 @@ jobs:
             sudo ln -sf ${BASEDIR}/${{ env.JELLYFIN_RELEASE_TYPE }}/${{ env.JELLYFIN_VERSION }} ${BASEDIR}/latest || exit 1
 
   Nuget:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: "Set dated version for unstable builds"
         id: version
@@ -680,6 +730,36 @@ jobs:
         run: |-
           ./build.py ${{ env.JELLYFIN_VERSION }} nuget
 
+  Helm:
+    name: "Release Helm chart"
+    # The chart's appVersion is the Docker image tag, so the image must be pushed first
+    needs:
+      - Docker
+    runs-on: ubuntu-26.04
+    environment: project-automation
+    steps:
+      - name: "Generate app token"
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.PROJECT_AUTOMATION_CLIENT_ID }}
+          private-key: ${{ secrets.PROJECT_AUTOMATION_KEY }}
+          owner: jellyfin
+          repositories: jellyfin-helm
+          permission-actions: write
+
+      - name: "Trigger chart version bump in jellyfin-helm"
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |-
+          APP_VERSION="${RELEASE_VERSION#v}"
+          gh workflow run app_release.yaml \
+            --repo jellyfin/jellyfin-helm \
+            --ref master \
+            --field jellyfin_version="${APP_VERSION}"
+          echo "Dispatched jellyfin-helm chart release with appVersion \`${APP_VERSION}\`: https://github.com/jellyfin/jellyfin-helm/actions/workflows/app_release.yaml" >> $GITHUB_STEP_SUMMARY
+
   MilestoneRollover:
     name: "Roll release milestones forward"
     needs:
@@ -693,7 +773,7 @@ jobs:
       - MacOS
       - Portable
       - Nuget
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     environment: project-automation
     continue-on-error: true
     steps:
@@ -702,7 +782,7 @@ jobs:
 
       - name: "Generate app token"
         id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           client-id: ${{ vars.PROJECT_AUTOMATION_CLIENT_ID }}
           private-key: ${{ secrets.PROJECT_AUTOMATION_KEY }}
