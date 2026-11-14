@@ -1,9 +1,9 @@
 [submodule "jellyfin-server"]
 	path = jellyfin-server
-url=https://github.com/IceStormNG/jellyfin.git
+url=https://code.braun-network.de/carsten.braun/jellyfin.git
 [submodule "jellyfin-web"]
 	path = jellyfin-web
-url=https://github.com/IceStormNG/jellyfin-web.git
+url=https://code.braun-network.de/carsten.braun/jellyfin-web.git
 [submodule "jellyfin-server-windows"]
 	path = jellyfin-server-windows
-	url = https://github.com/jellyfin/jellyfin-server-windows.git
+url=https://code.braun-network.de/carsten.braun/jellyfin-server-windows.git
